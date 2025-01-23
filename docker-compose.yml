@@ -1,0 +1,56 @@
+version: "3.8"
+services:
+  frontend:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - hypertube_network
+
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    ports:
+      - "5001:5001"
+    depends_on:
+      - db
+    environment:
+      - DATABASE_URL=postgres://hypertube_user:password@db:5432/hypertube
+    networks:
+      - hypertube_network
+
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: hypertube_user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: hypertube
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    networks:
+      - hypertube_network
+
+  nginx:
+    image: nginx:latest
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+      - ./client/build:/usr/share/nginx/html
+    ports:
+      - "80:80"
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - hypertube_network
+
+volumes:
+  db_data:
+
+networks:
+  hypertube_network:
+    driver: bridge
