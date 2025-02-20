@@ -2,16 +2,18 @@ const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
 const db = require('./db');
+const path = require('path');
+const httpAttach = require('http-attach')
+const HLSServer = require('hls-server')
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5001;
 
-// Middleware
-app.use(cors());
+const corsMiddleware = cors({ origin: 'http://localhost:3000' });
+app.use(corsMiddleware);
 app.use(express.json());
-
 
 app.get('/test', async (req, res) => {
     try {
@@ -23,16 +25,21 @@ app.get('/test', async (req, res) => {
     }
 });
 
-// Routes
 app.get('/', (req, res) => {
     res.send('Welcome to the Hypertube API!');
 });
 
-app.get('/testvideo.mp4', (req, res) => {
-    res.sendFile(__dirname + '/testvideo.mp4');
+app.get('/testvideo', (req, res) => {
+    res.sendFile(path.join(__dirname, '../videos/testvideo/testvideo.mp4'));
 });
 
-// Start server
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
 });
+
+const hls = new HLSServer(server, {
+    path: '/streams',
+    dir: 'videos/testvideo'
+})
+
+httpAttach(server, corsMiddleware)

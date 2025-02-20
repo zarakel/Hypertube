@@ -1,5 +1,7 @@
 import logo from './logo.svg';
 import './App.css';
+import React from 'react';
+import ReactPlayer from "react-player";
 
 function App() {
   return (
@@ -17,10 +19,16 @@ function App() {
         >
           Learn React
         </a>
+
+        {/* video test */}
         <video width="320" height="240" controls>
-          <source src="http://localhost:5001/testvideo.mp4" type="video/mp4" />
+          <source src="http://localhost:5001/testvideo" type="video/mp4" />
           Your browser does not support the video tag.
         </video>
+
+        {/* streaming test */}
+        <ReactPlayer url="http://localhost:5001/streams/output.m3u8" controls />
+
       </header>
     </div>
   );
