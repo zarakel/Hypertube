@@ -3,4 +3,4 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm install
 EXPOSE 5001
-CMD ["npm", "dev"]
+CMD ["npm", "run", "dev"]
