@@ -28,6 +28,10 @@ app.get('/', (req, res) => {
     res.send('Welcome to the Hypertube API!');
 });
 
+app.get('/testvideo.mp4', (req, res) => {
+    res.sendFile(__dirname + '/testvideo.mp4');
+});
+
 // Start server
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
