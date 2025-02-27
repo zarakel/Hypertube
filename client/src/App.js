@@ -1,34 +1,16 @@
 import logo from './logo.svg';
 import './App.css';
-import React from 'react';
-import ReactPlayer from "react-player";
+import VideoStreamPlayer from './VideoStreamPlayer';
 
 function App() {
   return (
     <div className="App">
       <header className="App-header">
         <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-
-        {/* video test */}
-        <video width="320" height="240" controls>
-          <source src="http://localhost:5001/testvideo" type="video/mp4" />
-          Your browser does not support the video tag.
-        </video>
-
-        {/* streaming test */}
-        <ReactPlayer url="http://localhost:5001/streams/output.m3u8" controls />
-
+        <h1>Hypertube</h1>
+        {/* <VideoStreamPlayer videoName="bigBuckBunny" /> */}
+        {/* <VideoStreamPlayer videoName="cosmosMagnet" /> */}
+        <VideoStreamPlayer videoName="sintelMagnet" />
       </header>
     </div>
   );
