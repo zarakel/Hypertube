@@ -8,9 +8,10 @@ function App() {
       <header className="App-header">
         <img src={logo} className="App-logo" alt="logo" />
         <h1>Hypertube</h1>
-        {/* <VideoStreamPlayer videoName="bigBuckBunny" /> */}
-        {/* <VideoStreamPlayer videoName="cosmosMagnet" /> */}
-        <VideoStreamPlayer videoName="sintelMagnet" />
+        <VideoStreamPlayer videoName="bigBuckBunny" />
+        {/* <VideoStreamPlayer videoName="cosmos" />
+        <VideoStreamPlayer videoName="sintel" />
+        <VideoStreamPlayer videoName="tears" /> */}
       </header>
     </div>
   );

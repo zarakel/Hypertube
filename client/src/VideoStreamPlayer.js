@@ -5,7 +5,7 @@ const VideoStreamPlayer = ({ videoName }) => {
   const [error, setError] = useState(null);
 
   function onVideoError(error) {
-    console.log("Video error.target.error", error.target.error);
+    console.log("Video error?.target?.error", error?.target?.error);
     setError("An error occurred while loading the video stream");
   }
 

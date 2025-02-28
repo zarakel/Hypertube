@@ -1,10 +1,8 @@
+require('dotenv').config();
 const express = require('express');
-const dotenv = require('dotenv');
 const cors = require('cors');
 const db = require('./db');
 const streamingRoutes = require('./streaming');
-
-dotenv.config();
 
 const PORT = process.env.PORT || 5001;
 const app = express();
