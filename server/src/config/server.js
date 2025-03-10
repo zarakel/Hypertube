@@ -7,7 +7,7 @@ function initServer(app, port) {
         console.log(`Server running on http://localhost:${port}`);
     });
 
-    return server; // Très important de retourner le serveur
+    return server;
 }
 
 module.exports = { initServer };

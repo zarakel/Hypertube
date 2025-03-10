@@ -1,6 +1,6 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const db = require('../config/db'); // Connexion à la DB
+const db = require('../config/db');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 require('dotenv').config();
@@ -57,23 +57,19 @@ const forgotPassword = async (req, res) => {
     const { email } = req.body;
 
     try {
-        // Vérifier si l'utilisateur existe
         const result = await db.pool.query('SELECT * FROM users WHERE email = $1', [email]);
         if (result.rows.length === 0) {
             return res.status(404).json({ message: "User not found" });
         }
 
-        // Générer un token de réinitialisation
         const resetToken = crypto.randomBytes(32).toString('hex');
         const expiresAt = new Date(Date.now() + 3600000); // Expire dans 1 heure
 
-        // Enregistrer le token dans la base de données
         await db.pool.query(
             'UPDATE users SET reset_token = $1, reset_token_expires = $2 WHERE email = $3',
             [resetToken, expiresAt, email]
         );
 
-        // Configuration de l'envoi d'email
         let transporter = nodemailer.createTransport({
             host: "smtp.gmail.com",
             port: 465,
@@ -81,7 +77,7 @@ const forgotPassword = async (req, res) => {
             auth: {
               type: "OAuth2",
               user: process.env.EMAIL_USER,
-              accessToken: "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",
+              accessToken: process.env.CLIENT_SECRET,
             },
           });
 
