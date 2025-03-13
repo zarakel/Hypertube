@@ -61,7 +61,9 @@ shell:
 
 # Restart the services
 .PHONY: restart
-restart: down up
+restart:
+	docker compose down -v
+	docker compose up --build
 	@echo "Services restarted successfully!"
 
 # Remove all Docker artifacts (use with caution)

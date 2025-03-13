@@ -1,32 +1,26 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const db = require('./db');
-const streamingRoutes = require('./streaming');
+const { initDB } = require('./config/db');
+const { initServer } = require('./config/server');
+const authRoutes = require('./routes/auth');
+const streamRoutes = require('./routes/stream');
+const rootRoutes = require('./routes/root');
+const protectedRoutes = require('./routes/protectedRoute');
 
 const PORT = process.env.PORT || 5001;
 const app = express();
 
-const corsMiddleware = cors({ origin: 'http://localhost:3000' });
-app.use(corsMiddleware);
+app.use(cors({ origin: 'http://localhost:3000' }));
 app.use(express.json());
 
-app.get('/test', async (req, res) => {
-    try {
-        const result = await db.query('SELECT * FROM users'); // Remplace `users` par ta table réelle
-        res.json(result.rows);
-    } catch (err) {
-        console.error("Database query error:", err.message);
-        res.status(500).json({ error: "Internal Server Error" });
-    }
-});
+initDB();
 
-app.get('/', (req, res) => {
-    res.send('Welcome to the Hypertube API!');
-});
+app.use('/auth', authRoutes);
+app.use('/stream', streamRoutes);
+app.use('/', rootRoutes);
+app.use('/protected', protectedRoutes);
 
-streamingRoutes(app);
-
-app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+const server = app.listen(PORT, () => {
+    console.log(`Server is running on http://localhost:${PORT}`);
 });
