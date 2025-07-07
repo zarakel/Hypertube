@@ -223,6 +223,7 @@ async function getOrCreateEngine(magnetURI) {
 		engine.on("ready", () => {
 			clearTimeout(timeout);
 			console.log(`New torrent engine added: ${infoHash}`);
+			engines[infoHash] = engine;
 			engine.lastUsed = Date.now();
 			engines[infoHash] = engine;
 			resolve(engine);
