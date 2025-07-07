@@ -14,9 +14,10 @@ const VIDEO_NAMES_TO_MAGNET_URIS = {
 const ENGINE_CLEANUP_INTERVAL = 30 * 1000; //NOTE: 30 seconds
 const ENGINE_CLEANUP_TIMEOUT = 30 * 1000; //NOTE: 30 seconds
 const VIDEO_FILES_EXTENSIONS_REGEX = /\.(mp4|ogg|webm)$/i;
+const SUBTITLE_FILES_EXTENSIONS_REGEX = /\.(srt|vtt)$/i;
 const STREAM_CHUNK_SIZE_BYTES = 10 * 1024 * 1024;
 const DOWNLOAD_LOG_INTERVAL = 10;
-const DONWLOAD_ENTIRE_FILE_ON_STREAM_START = IS_PROD;
+const DOWNLOAD_ENTIRE_VIDEO_ON_STREAM_START = IS_PROD;
 
 const engines = {};
 
@@ -30,15 +31,13 @@ router.get('/:videoName', async (req, res) => {
 
 	try {
 		const engine = await getOrCreateEngine(magnetURI);
-		engine.lastUsed = Date.now();
-
-		const videoFile = getBestVideoFile(engine.files);
+		const videoFile = getBiggestFileByExtension(engine.files, VIDEO_FILES_EXTENSIONS_REGEX);
 
 		if (!videoFile) {
 			return res.status(404).send('No video file found in torrent');
 		}
 
-		if (DONWLOAD_ENTIRE_FILE_ON_STREAM_START) {
+		if (DOWNLOAD_ENTIRE_VIDEO_ON_STREAM_START) {
 			videoFile.select();
 		}
 
@@ -62,40 +61,114 @@ router.get('/:videoName', async (req, res) => {
 
 		const stream = videoFile.createReadStream({ start, end });
 
+		stream.on('data', () => {
+			engine.lastUsed = Date.now();
+		});
+
 		stream.on('error', (err) => {
 			console.error('Stream error:', err);
+			stream.unpipe(res);
+			stream.destroy();
+
 			if (!res.headersSent) {
 				res.status(500).send('Streaming error');
-			} else {
-				res.end();
 			}
 		});
 
 		stream.pipe(res);
 	} catch (err) {
-		console.error('GET /stream error:', err);
-		if (!res.headersSent) {
-			res.status(500).send(`Error: ${err.message}`);
-		} else {
-			res.end();
-		}
+		trySendErrorResponse(res, err, req);
 	}
 });
 
-function getBestVideoFile(files) {
-	let videoFile = null;
-	let maxSize = 0;
+router.get('/:videoName/subtitle/:subtitleName', async (req, res) => {
+	const videoName = req.params.videoName;
+	const subtitleName = req.params.subtitleName;
+	const magnetURI = VIDEO_NAMES_TO_MAGNET_URIS[videoName];
 
-	for (const file of files) {
-		if (VIDEO_FILES_EXTENSIONS_REGEX.test(file.name)) {
-			if (file.length > maxSize) {
-				videoFile = file;
-				maxSize = file.length;
-			}
-		}
+	if (!magnetURI) {
+		return res.status(404).send('Video not found');
 	}
 
-	return videoFile;
+	try {
+		const engine = await getOrCreateEngine(magnetURI);
+		const subtitleFile = engine.files.find(file => file.name === subtitleName);
+		subtitleFile.select();
+
+		if (!subtitleFile) {
+			return res.status(404).send('No subtitle file found in torrent');
+		}
+
+		res.setHeader('Content-Type', 'text/vtt');
+
+		if (subtitleFile.name.endsWith('.srt')) {
+			let data = '';
+			subtitleFile.createReadStream()
+				.on('data', chunk => data += chunk)
+				.on('end', () => {
+					//NOTE: SRT to VTT conversion
+					const vtt = 'WEBVTT\n\n' + data
+						.replace(/\r\n/g, '\n')
+						.replace(/\r/g, '\n')
+						.replace(/(\d+\s*)\n(\d{2}:\d{2}:\d{2}),(\d{3}) --> (\d{2}:\d{2}:\d{2}),(\d{3})/g,
+							'$2.$3 --> $4.$5');
+					res.end(vtt);
+				});
+
+			return;
+		}
+
+		subtitleFile.createReadStream().pipe(res);
+	} catch (err) {
+		trySendErrorResponse(res, err, req);
+	}
+});
+
+router.get('/:videoName/subtitles', async (req, res) => {
+	const videoName = req.params.videoName;
+	const magnetURI = VIDEO_NAMES_TO_MAGNET_URIS[videoName];
+
+	if (!magnetURI) {
+		return res.status(404).send('Video not found');
+	}
+
+	try {
+		const engine = await getOrCreateEngine(magnetURI);
+		const subtitleFiles = getAllFilesByExtension(engine.files, SUBTITLE_FILES_EXTENSIONS_REGEX);
+
+		const subtitles = subtitleFiles.map(file => {
+			const lang = guessLanguageFromFilename(file.name);
+			return {
+				lang,
+				path: `/stream/${videoName}/subtitle/${encodeURIComponent(file.name)}`
+			};
+		});
+
+		res.json(subtitles);
+	} catch (err) {
+		trySendErrorResponse(res, err, req);
+	}
+});
+
+function getBiggestFileByExtension(files, extensionRegex) {
+	const filteredFiles = getAllFilesByExtension(files, extensionRegex);
+
+	if (filteredFiles.length === 0) {
+		return null;
+	}
+
+	return filteredFiles.reduce((largest, file) => {
+		return file.length > largest.length ? file : largest;
+	});
+}
+
+function getAllFilesByExtension(files, extensionRegex) {
+	return files.filter(file => extensionRegex.test(file.name));
+}
+
+function guessLanguageFromFilename(filename) {
+	const languageMatch = filename.match(/[\.\-_]([a-z]{2,3})(?:[\.\-_]|$)/i);
+	return languageMatch ? languageMatch[1].toLowerCase() : 'unknown';
 }
 
 function getBytesRange(range, fileSize) {
@@ -118,15 +191,29 @@ function getBytesRange(range, fileSize) {
 	return [start, end];
 }
 
-function getOrCreateEngine(magnetURI) {
+function trySendErrorResponse(res, err, req) {
+	console.error(`Error in ${req.method} ${req.originalUrl}:`, err);
+
+	if (!res.headersSent) {
+		res.status(500).send(`Error: ${err.message}`);
+	}
+	else {
+		res.end();
+	}
+}
+
+async function getOrCreateEngine(magnetURI) {
 	const infoHashMatch = magnetURI.match(/btih:([a-zA-Z0-9]+)/i);
 	const infoHash = infoHashMatch ? infoHashMatch[1].toLowerCase() : null;
+	const engine = engines[infoHash];
 
-	if (infoHash && engines[infoHash]) {
-		return Promise.resolve(engines[infoHash]);
+	if (engine) {
+		engine.lastUsed = Date.now();
+
+		return engines[infoHash];
 	}
 
-	return new Promise((resolve, reject) => {
+	engines[infoHash] = new Promise((resolve, reject) => {
 		const engine = torrentStream(magnetURI);
 
 		const timeout = setTimeout(() => {
@@ -135,14 +222,10 @@ function getOrCreateEngine(magnetURI) {
 
 		engine.on("ready", () => {
 			clearTimeout(timeout);
-			const engineInfoHash = engine.infoHash;
-
-			if (!engines[engineInfoHash]) {
-				console.log(`New torrent engine added: ${engineInfoHash}`);
-				engines[engineInfoHash] = engine;
-			}
-
-			resolve(engines[engineInfoHash]);
+			console.log(`New torrent engine added: ${infoHash}`);
+			engine.lastUsed = Date.now();
+			engines[infoHash] = engine;
+			resolve(engine);
 		});
 
 		engine.on("error", (err) => {
@@ -154,12 +237,15 @@ function getOrCreateEngine(magnetURI) {
 		let downloadCount = 0;
 
 		engine.on('download', (pieceIndex) => {
+			engine.lastUsed = Date.now();
 			++downloadCount;
 			if (downloadCount % DOWNLOAD_LOG_INTERVAL === 0) {
 				console.log(`Downloaded ${downloadCount} pieces with torrent engine: ${infoHash}`);
 			}
 		});
 	});
+
+	return engines[infoHash];
 }
 
 function enginesCleanup() {
